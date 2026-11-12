@@ -1,0 +1,14 @@
+services:
+  - type: worker
+    name: hellx-voice-chat-bot
+    runtime: python
+    plan: starter
+    buildCommand: bash build.sh
+    startCommand: bash start.sh
+    envVars:
+      - key: PYTHON_VERSION
+        value: 3.12.11
+      - key: ACCOUNTS_FILE
+        value: /etc/secrets/accs.txt
+      - key: TELEGRAM_BOT_TOKEN
+        sync: false

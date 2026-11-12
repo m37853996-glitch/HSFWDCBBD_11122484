@@ -1,0 +1,81 @@
+BOT REPAIR NOTES
+========================
+
+What this revision fixes
+------------------------
+1. /song allocates exactly ONE account session to a team code.
+   - Sessions already in a team are skipped.
+   - The next distinct /song request rotates to the next available idle session.
+   - A failed/uncertain join does not trigger a parallel join from other accounts.
+   - Repeating /song with the same confirmed team code does not add another account.
+
+2. Music playback stability improvements.
+   - Music is encoded with FFmpeg's Opus audio application at 48 kHz mono, using the
+     bitrate negotiated by the voice server, a 20 ms frame duration, and peak limiting.
+   - UDP frame sends use the event loop's asynchronous socket-send path when available;
+     late scheduling is re-based instead of sending a burst of overdue frames.
+   - Repetitive voice-TCP hex logging is sampled to reduce console I/O during playback.
+   - Ogg/Opus packet parsing reconstructs packets across Ogg lacing/page boundaries.
+   - The existing in-game /play and !play search/download/playback flow remains in place.
+
+3. Stop and developer commands.
+   - In-game squad-chat /stop and !stop stop playback and leave the current squad.
+   - Telegram has no /stop command; the bot's Telegram commands are /start, /help,
+     /song TEAM_CODE, and /dev for everyone in the allowed group.
+   - /dev lists @qk_7x and @meropvp.
+   - /start and /help show the compact public command guide.
+
+Telegram access
+---------------
+Allowed group: https://t.me/loginbplike
+Developer Telegram ID: 8401495212
+Ordinary Telegram group commands: /start, /help, /song TEAM_CODE, and /dev.
+Use /stop in the Free Fire squad chat (not in Telegram) to stop music and leave the squad.
+Developer-only controls appear only in the developer's private chat.
+
+Preserve your existing private configuration
+---------------------------------------------
+This repair archive intentionally does NOT contain config.json or accs.txt.
+That is deliberate: your local copies may contain your current Telegram bot token,
+video file IDs, and the full account list. Extract this archive OVER your existing
+project directory so those two files remain untouched.
+
+The source continues to load game credentials ONLY from accs.txt, one account per
+line, in UID:PASSWORD format. Do not rename or replace your existing accs.txt.
+
+Music dependencies
+------------------
+For Render/Linux, use the included build and start files:
+  Build Command: bash build.sh
+  Start Command: bash start.sh
+
+The included requirements.txt installs aiohttp, protobuf, pycryptodome, and
+current yt-dlp with its default EJS support. Deno is installed for current
+YouTube JavaScript challenge solving. FFmpeg with libopus is checked at build
+and startup; if the host FFmpeg lacks libopus, the build script installs the
+portable imageio-ffmpeg fallback. Docker installs the Linux FFmpeg package.
+
+For Termux only:
+  pkg install ffmpeg
+  python -m pip install -r requirements.txt
+
+Do not copy the supplied Windows ffmpeg.exe into Render/Linux. Keep the existing
+opus directory if you still use Windows, but Linux uses FFmpeg/libopus directly.
+The sender timing improvements reduce locally controllable bursts and skipped
+Opus frames; they cannot eliminate network loss or host/game-server interruptions.
+
+Important
+---------
+Local checks completed for this revision:
+- all Python files compile and both shell scripts pass bash syntax checks;
+- mocked YouTube result ranking and the five-minute search cache pass;
+- FFmpeg generated a three-second 48 kHz mono Opus stream (151 packets);
+- localhost UDP test received 54 packets during the first 1.08 seconds, with
+  20.19 ms median interval and 21.28 ms maximum observed gap;
+- valid Opus packets beginning with TOC byte 0x78 are retained (the old code
+  accidentally discarded all such packets from the synthetic test stream);
+- the updated developer handle is present in the source.
+
+The environment did not have yt-dlp installed and could not fetch Python packages,
+so live YouTube extraction/download and live Telegram/Free Fire sessions were not
+tested here. No claim of 100% live-network or zero-dropout behavior is made.

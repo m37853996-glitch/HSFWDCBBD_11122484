@@ -1,0 +1,56 @@
+MEDIA / PERFORMANCE VALIDATION
+===================================
+
+Deployment and dependencies
+---------------------------
+- Added requirements.txt for aiohttp, protobuf, pycryptodome, and yt-dlp[default].
+- Added Render Background Worker configuration plus native-Python build/start scripts.
+- Added Dockerfile for Linux hosts that deploy from Docker.
+- Startup checks imports and verifies that the selected FFmpeg binary has libopus.
+- The resolver skips an FFmpeg binary without libopus and tries imageio-ffmpeg as a fallback.
+- YouTube extraction is configured for the yt-dlp EJS package and Deno/Node runtime.
+- The Windows FFmpeg archive supplied separately is not used on Linux hosts; Render's
+  native runtime includes Linux FFmpeg, and Docker installs the Linux package.
+
+Search behavior
+---------------
+- /play searches up to five flat YouTube candidates and ranks them by requested
+  title/channel token overlap instead of blindly taking the first result.
+- A second "official audio" search is attempted only if the first batch has no
+  convincing match.
+- Successful query selections are cached for five minutes (maximum 64 entries).
+- Search uses bounded network timeouts/retries; it does not wait indefinitely.
+
+Audio pipeline and UDP pacing
+-----------------------------
+- Audio is encoded as 48 kHz mono Opus, 20 ms frames, using the negotiated voice
+  bitrate and peak limiting.
+- Ogg lacing/page continuation is parsed into complete Opus packets.
+- Valid Opus packets whose first TOC byte is 0x78 are preserved. The previous
+  implementation discarded them; a local FFmpeg-generated stream consisted of
+  151 such packets, so the old filter would remove all 151 frames in that test.
+- If a sender scheduling deadline is missed, the next packet is scheduled one full
+  20 ms interval later rather than sending overdue packets in a burst.
+- Previous UDP tasks are cancelled and awaited before a replacement track starts.
+
+Local validation performed for this revision
+--------------------------------------------
+- Python syntax compilation for all project .py files: PASS.
+- Bash syntax check for build.sh and start.sh: PASS.
+- Search argument/ranking/cache test using mocked yt-dlp output: PASS.
+- FFmpeg generated a three-second 48 kHz mono Opus stream: 151 complete packets.
+- UDP sender test against localhost: PASS; 54 frames received in the first 1.08 s,
+  median interval 20.19 ms, maximum observed interval 21.28 ms.
+- The system FFmpeg binary in the test environment exposes libopus: PASS.
+- Developer handle scan: the requested developer handle is present.
+
+Important test limits
+---------------------
+This environment did not have yt-dlp installed and could not download Python
+packages from the internet. Therefore the actual YouTube extraction/download was
+not live-tested here; search correctness was tested with mocked yt-dlp results.
+The bot was not connected to Telegram or Free Fire servers, so live login, squad
+join, voice relay, and playback quality have not been certified. Network loss,
+host restrictions on outbound UDP, Android scheduling, and the game's voice
+servers can still cause interruptions. A host must allow long-running workers and
+outbound TCP/UDP traffic required by the game protocol.
